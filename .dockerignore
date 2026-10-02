@@ -1,0 +1,15 @@
+.git
+.github
+.venv
+.cache
+samples
+report
+reports
+*.apk
+*.zip
+**/__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache
+tests
+docs

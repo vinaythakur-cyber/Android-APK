@@ -1,0 +1,29 @@
+# --- Never commit APKs or anything derived from a scanned app ---
+*.apk
+*.aab
+*.xapk
+*.dex
+*.zip
+samples/
+report/
+reports/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+.cache/

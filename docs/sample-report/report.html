@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>apk-sentinel report: com.example.vulnapp</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --surface: #ffffff; --text: #1b1f24; --muted: #596270;
+    --border: #dde1e6; --code-bg: #f0f2f5; --accent: #1d4ed8; --accent-fg: #ffffff;
+    --critical: #9f1239; --high: #b91c1c; --medium: #92400e; --low: #1d4ed8; --info: #475569;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1216; --surface: #181c22; --text: #e6e9ed; --muted: #9aa4b1;
+      --border: #2b323b; --code-bg: #10141a; --accent: #7aa2ff; --accent-fg: #0b1220;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  h2 { font-size: 1.15rem; margin: 32px 0 12px; }
+  .muted { color: var(--muted); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; }
+  .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px 24px;
+    margin-top: 14px; }
+  .meta dt { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--muted); }
+  .meta dd { margin: 0 0 6px; word-break: break-all; font-variant-numeric: tabular-nums; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-left-width: 5px;
+    border-radius: 8px; padding: 10px 12px; }
+  .tile b { display: block; font-size: 1.7rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .tile span { font-size: .78rem; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--muted); }
+  .t-critical { border-left-color: var(--critical); } .t-high { border-left-color: var(--high); }
+  .t-medium { border-left-color: var(--medium); } .t-low { border-left-color: var(--low); }
+  .t-info { border-left-color: var(--info); }
+  .bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin-top: 14px;
+    background: var(--border); }
+  .bar i { display: block; height: 100%; }
+  .b-critical { background: var(--critical); } .b-high { background: var(--high); }
+  .b-medium { background: var(--medium); } .b-low { background: var(--low); }
+  .b-info { background: var(--info); }
+  .banner { border: 1px solid var(--high); background: var(--surface); border-radius: 8px;
+    padding: 10px 14px; margin-top: 16px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .toolbar input[type=search] { flex: 1 1 220px; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; }
+  .chip { cursor: pointer; user-select: none; border: 1px solid var(--border); border-radius: 999px;
+    padding: 3px 12px; background: var(--surface); font-size: .85rem; }
+  .chip[aria-pressed=true] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+  details.finding { background: var(--surface); border: 1px solid var(--border);
+    border-left-width: 5px; border-radius: 8px; margin-bottom: 8px; }
+  details.finding > summary { cursor: pointer; padding: 10px 14px; list-style: none; display: flex;
+    gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  details.finding > summary::-webkit-details-marker { display: none; }
+  details.finding > summary::before { content: "\25B8"; color: var(--muted); }
+  details.finding[open] > summary::before { content: "\25BE"; }
+  .s-critical { border-left-color: var(--critical); } .s-high { border-left-color: var(--high); }
+  .s-medium { border-left-color: var(--medium); } .s-low { border-left-color: var(--low); }
+  .s-info { border-left-color: var(--info); }
+  .badge { color: #fff; font-size: .7rem; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; padding: 2px 8px; border-radius: 4px; }
+  .badge.critical { background: var(--critical); } .badge.high { background: var(--high); }
+  .badge.medium { background: var(--medium); } .badge.low { background: var(--low); }
+  .badge.info { background: var(--info); }
+  .title { font-weight: 600; }
+  .rule { font-size: .8rem; color: var(--muted); font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .body { padding: 0 14px 14px 29px; }
+  .body h3 { margin: 12px 0 2px; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--muted); }
+  .body p { margin: 0; }
+  pre, code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .85rem; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 10px; margin: 0; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+  .masvs { display: inline-block; margin: 2px 6px 2px 0; padding: 1px 8px; border-radius: 4px;
+    border: 1px solid var(--border); background: var(--code-bg); font-size: .8rem;
+    font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  td code { white-space: nowrap; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border);
+    vertical-align: top; }
+  th { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .empty { text-align: center; padding: 32px; color: var(--muted); }
+  footer { margin-top: 40px; font-size: .82rem; color: var(--muted); }
+  [hidden] { display: none !important; }
+  @media print { details.finding > .body { display: block; } .toolbar { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>apk-sentinel report</h1>
+  <div class="muted">Static analysis of <b>com.example.vulnapp</b>
+v1.0</div>
+  <div class="card meta">
+    <div><dt>File</dt><dd>vulnapp.apk</dd></div>
+    <div><dt>SHA-256</dt><dd>60577e0508130efc18e702c9a82827a79675a5da70f536ea69baa68957967c7c</dd></div>
+    <div><dt>Size</dt><dd>3,742 bytes</dd></div>
+    <div><dt>minSdk / targetSdk</dt><dd>15 /
+      28</dd></div>
+    <div><dt>Scanned</dt><dd>2026-10-02 08:55 UTC</dd></div>
+    <div><dt>Tool</dt><dd>apk-sentinel 0.1.0
+      (0.02s)</dd></div>
+  </div>
+</header>
+
+<h2>Summary</h2>
+<div class="tiles">
+  <div class="tile t-critical"><b>1</b><span>critical</span></div>
+  <div class="tile t-high"><b>11</b><span>high</span></div>
+  <div class="tile t-medium"><b>14</b><span>medium</span></div>
+  <div class="tile t-low"><b>5</b><span>low</span></div>
+  <div class="tile t-info"><b>1</b><span>info</span></div>
+</div>
+<div class="bar" role="img"
+     aria-label="Findings by severity: 1 critical, 11 high, 14 medium, 5 low, 1 info">
+<i class="b-critical" style="width: 3.12%"></i><i class="b-high" style="width: 34.38%"></i><i class="b-medium" style="width: 43.75%"></i><i class="b-low" style="width: 15.62%"></i><i class="b-info" style="width: 3.12%"></i></div>
+
+
+<h2>OWASP MASVS v2 coverage</h2>
+<div class="card tablewrap">
+  <table>
+    <thead><tr><th>Control</th><th>Requirement</th><th>Findings</th><th>Worst</th></tr></thead>
+    <tbody>
+      <tr><td><code>MASVS-AUTH-1</code></td><td>The app uses secure authentication and authorization protocols and follows the relevant best practices.</td>
+          <td>1</td><td><span class="badge medium">medium</span></td></tr>
+      <tr><td><code>MASVS-CODE-1</code></td><td>The app requires an up-to-date platform version.</td>
+          <td>2</td><td><span class="badge medium">medium</span></td></tr>
+      <tr><td><code>MASVS-CRYPTO-1</code></td><td>The app employs current strong cryptography and uses it according to industry best practices.</td>
+          <td>7</td><td><span class="badge high">high</span></td></tr>
+      <tr><td><code>MASVS-CRYPTO-2</code></td><td>The app performs key management according to industry best practices.</td>
+          <td>5</td><td><span class="badge critical">critical</span></td></tr>
+      <tr><td><code>MASVS-NETWORK-1</code></td><td>The app secures all network traffic according to the current best practices.</td>
+          <td>7</td><td><span class="badge high">high</span></td></tr>
+      <tr><td><code>MASVS-NETWORK-2</code></td><td>The app performs identity pinning for all remote endpoints under the developer&#39;s control.</td>
+          <td>1</td><td><span class="badge info">info</span></td></tr>
+      <tr><td><code>MASVS-PLATFORM-1</code></td><td>The app uses IPC mechanisms securely.</td>
+          <td>3</td><td><span class="badge high">high</span></td></tr>
+      <tr><td><code>MASVS-PLATFORM-2</code></td><td>The app uses WebViews securely.</td>
+          <td>1</td><td><span class="badge high">high</span></td></tr>
+      <tr><td><code>MASVS-PRIVACY-1</code></td><td>The app minimizes access to sensitive data and resources.</td>
+          <td>4</td><td><span class="badge medium">medium</span></td></tr>
+      <tr><td><code>MASVS-RESILIENCE-4</code></td><td>The app implements anti-dynamic analysis techniques.</td>
+          <td>1</td><td><span class="badge high">high</span></td></tr>
+      <tr><td><code>MASVS-STORAGE-2</code></td><td>The app prevents leakage of sensitive data.</td>
+          <td>6</td><td><span class="badge high">high</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>Findings (32)</h2>
+<div class="toolbar" id="toolbar">
+  <input type="search" id="q" placeholder="Search title, rule, location, evidence…" aria-label="Search findings">
+  <button type="button" class="chip" data-sev="critical" aria-pressed="true">critical (1)</button>
+  <button type="button" class="chip" data-sev="high" aria-pressed="true">high (11)</button>
+  <button type="button" class="chip" data-sev="medium" aria-pressed="true">medium (14)</button>
+  <button type="button" class="chip" data-sev="low" aria-pressed="true">low (5)</button>
+  <button type="button" class="chip" data-sev="info" aria-pressed="true">info (1)</button>
+</div>
+<div id="findings">
+  <details class="finding s-critical" data-sev="critical" data-search="hardcoded secret: private key material secret-private-key classes.dex string pool -----begin rsa private key----- secrets">
+    <summary>
+      <span class="badge critical">critical</span>
+      <span class="title">Hardcoded secret: Private key material</span>
+      <span class="rule">SECRET-PRIVATE-KEY</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>A PEM private key header was found in the app&#39;s strings. Private keys must never leave the server or the platform keystore.</p>
+<h3>Evidence</h3><pre>-----BEGIN RSA PRIVATE KEY-----</pre><h3>Location</h3><pre>classes.dex string pool</pre><h3>Fix</h3><p>Revoke the key pair, generate a new one, and keep private keys server-side or in the Android Keystore.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app performs key management according to industry best practices.">MASVS-CRYPTO-2</span>        <span class="muted">analyzer: secrets · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-high" data-sev="high" data-search="weak cipher algorithm: des crypto-001 com.example.vulnapp.weakcrypto.run() &#34;des/ecb/pkcs5padding&#34; crypto">
+    <summary>
+      <span class="badge high">high</span>
+      <span class="title">Weak cipher algorithm: DES</span>
+      <span class="rule">CRYPTO-001</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>DES has a 56-bit key and can be brute-forced in hours.</p>
+<h3>Evidence</h3><pre>&#34;DES/ECB/PKCS5Padding&#34;</pre><h3>Location</h3><pre>com.example.vulnapp.WeakCrypto.run()</pre><h3>Fix</h3><p>Use AES-256-GCM (or ChaCha20-Poly1305) via the Android Keystore.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app employs current strong cryptography and uses it according to industry best practices.">MASVS-CRYPTO-1</span>        <span class="muted">analyzer: crypto · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-high" data-sev="high" data-search="ecb block-cipher mode crypto-002 com.example.vulnapp.weakcrypto.run() cipher.getinstance(&#34;des/ecb/pkcs5padding&#34;) crypto">
+    <summary>
+      <span class="badge high">high</span>
+      <span class="title">ECB block-cipher mode</span>
+      <span class="rule">CRYPTO-002</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>ECB encrypts identical plaintext blocks to identical ciphertext blocks, leaking structure and allowing block rearrangement.</p>
+<h3>Evidence</h3><pre>Cipher.getInstance(&#34;DES/ECB/PKCS5Padding&#34;)</pre><h3>Location</h3><pre>com.example.vulnapp.WeakCrypto.run()</pre><h3>Fix</h3><p>Use an authenticated mode such as AES/GCM/NoPadding with a fresh random IV for every message.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app employs current strong cryptography and uses it according to industry best practices.">MASVS-CRYPTO-1</span>        <span class="muted">analyzer: crypto · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-high" data-sev="high" data-search="hardcoded encryption key crypto-005 com.example.vulnapp.weakcrypto.hardkey() secretkeyspec built from string literal &#34;mysu***********y1 (17 chars)&#34; crypto">
+    <summary>
+      <span class="badge high">high</span>
+      <span class="title">Hardcoded encryption key</span>
+      <span class="rule">CRYPTO-005</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>The symmetric key is embedded in the app. Anyone can extract it from the APK and decrypt all data protected by it.</p>
+<h3>Evidence</h3><pre>SecretKeySpec built from string literal &#34;MySu***********y1 (17 chars)&#34;</pre><h3>Location</h3><pre>com.example.vulnapp.WeakCrypto.hardKey()</pre><h3>Fix</h3><p>Generate keys at runtime inside the Android Keystore; never ship key material in code or resources.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app performs key management according to industry best practices.">MASVS-CRYPTO-2</span>        <span class="muted">analyzer: crypto · confidence: medium</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-high" data-sev="high" data-search="application is debuggable manifest-001 androidmanifest.xml &lt;application&gt; &lt;application android:debuggable=&#34;true&#34;&gt; manifest">
+    <summary>
+      <span class="badge high">high</span>
+      <span class="title">Application is debuggable</span>
+      <span class="rule">MANIFEST-001</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>android:debuggable is true. Anyone with USB access can attach a debugger, run commands as the app (run-as), read its private data and bypass client-side checks.</p>
+<h3>Evidence</h3><pre>&lt;application android:debuggable=&#34;true&#34;&gt;</pre><h3>Location</h3><pre>AndroidManifest.xml &lt;application&gt;</pre><h3>Fix</h3><p>Never ship debuggable builds. Remove the attribute; release build types set it to false by default.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app implements anti-dynamic analysis techniques.">MASVS-RESILIENCE-4</span>        <span class="muted">analyzer: manifest · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-high" data-sev="high" data-search="exported provider without permission: notesprovider manifest-006 androidmanifest.xml &lt;provider com.example.vulnapp.notesprovider&gt; &lt;provider android:name=&#34;com.example.vulnapp.notesprovider&#34;&gt; exported, no permission manifest">
+    <summary>
+      <span class="badge high">high</span>
+      <span class="title">Exported provider without permission: NotesProvider</span>
+      <span class="rule">MANIFEST-006</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>This provider is reachable by any app on the device because android:exported is true, and no android:permission protects it. Untrusted callers can send it crafted intents. Any app can query this provider&#39;s data.</p>
+<h3>Evidence</h3><pre>&lt;provider android:name=&#34;com.example.vulnapp.NotesProvider&#34;&gt; exported, no permission</pre><h3>Location</h3><pre>AndroidManifest.xml &lt;provider com.example.vulnapp.NotesProvider&gt;</pre><h3>Fix</h3><p>Set android:exported=&#34;false&#34; unless external access is required; otherwise guard it with a signature-level android:permission and validate all incoming data.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app uses IPC mechanisms securely.">MASVS-PLATFORM-1</span>        <span class="muted">analyzer: manifest · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-high" data-sev="high" data-search="trustmanager accepts any server certificate network-001 com.example.vulnapp.trustall.checkservertrusted() com.example.vulnapp.trustall implements x509trustmanager; checkservertrusted is empty network">
+    <summary>
+      <span class="badge high">high</span>
+      <span class="title">TrustManager accepts any server certificate</span>
+      <span class="rule">NETWORK-001</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>checkServerTrusted() has an empty body, so TLS certificates are never validated. A network attacker can impersonate any server and read or modify supposedly encrypted traffic (man-in-the-middle).</p>
+<h3>Evidence</h3><pre>com.example.vulnapp.TrustAll implements X509TrustManager; checkServerTrusted is empty</pre><h3>Location</h3><pre>com.example.vulnapp.TrustAll.checkServerTrusted()</pre><h3>Fix</h3><p>Delete the custom TrustManager and use the platform default. To trust a private CA, add it via network_security_config.xml; to pin, use &lt;pin-set&gt;.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app secures all network traffic according to the current best practices.">MASVS-NETWORK-1</span>        <span class="muted">analyzer: network · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-high" data-sev="high" data-search="hostnameverifier accepts every hostname network-002 com.example.vulnapp.allowallverifier.verify() com.example.vulnapp.allowallverifier.verify(...) always returns true network">
+    <summary>
+      <span class="badge high">high</span>
+      <span class="title">HostnameVerifier accepts every hostname</span>
+      <span class="rule">NETWORK-002</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>verify() unconditionally returns true, so a valid certificate issued for *any* domain is accepted for *every* domain, enabling man-in-the-middle attacks.</p>
+<h3>Evidence</h3><pre>com.example.vulnapp.AllowAllVerifier.verify(...) always returns true</pre><h3>Location</h3><pre>com.example.vulnapp.AllowAllVerifier.verify()</pre><h3>Fix</h3><p>Use the default HostnameVerifier (HttpsURLConnection.getDefaultHostnameVerifier()).</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app secures all network traffic according to the current best practices.">MASVS-NETWORK-1</span>        <span class="muted">analyzer: network · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-high" data-sev="high" data-search="webview ignores ssl errors (handler.proceed()) network-003 com.example.vulnapp.laxwebviewclient.onreceivedsslerror() com.example.vulnapp.laxwebviewclient.onreceivedsslerror calls handler.proceed() network">
+    <summary>
+      <span class="badge high">high</span>
+      <span class="title">WebView ignores SSL errors (handler.proceed())</span>
+      <span class="rule">NETWORK-003</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>onReceivedSslError calls SslErrorHandler.proceed(), continuing to load pages that failed certificate validation. Attackers can inject content into the WebView.</p>
+<h3>Evidence</h3><pre>com.example.vulnapp.LaxWebViewClient.onReceivedSslError calls handler.proceed()</pre><h3>Location</h3><pre>com.example.vulnapp.LaxWebViewClient.onReceivedSslError()</pre><h3>Fix</h3><p>Call handler.cancel() and show an error instead.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app secures all network traffic according to the current best practices.">MASVS-NETWORK-1</span><span class="masvs" title="The app uses WebViews securely.">MASVS-PLATFORM-2</span>        <span class="muted">analyzer: network · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-high" data-sev="high" data-search="user-installed cas are trusted network-005 res/xml/network_security_config.xml &lt;base-config&gt; ... &lt;certificates src=&#34;user&#34;/&gt; network">
+    <summary>
+      <span class="badge high">high</span>
+      <span class="title">User-installed CAs are trusted</span>
+      <span class="rule">NETWORK-005</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>A &lt;certificates src=&#34;user&#34;&gt; trust anchor makes the app accept certificates from CAs the device user installed, which is how interception proxies (and malware) MITM TLS.</p>
+<h3>Evidence</h3><pre>&lt;base-config&gt; ... &lt;certificates src=&#34;user&#34;/&gt;</pre><h3>Location</h3><pre>res/xml/network_security_config.xml</pre><h3>Fix</h3><p>Trust only system CAs in release builds; limit user CAs to &lt;debug-overrides&gt;.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app secures all network traffic according to the current best practices.">MASVS-NETWORK-1</span>        <span class="muted">analyzer: network · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-high" data-sev="high" data-search="hardcoded secret: aws access key id secret-aws-access-key classes.dex string pool akia************le (20 chars) secrets">
+    <summary>
+      <span class="badge high">high</span>
+      <span class="title">Hardcoded secret: AWS access key ID</span>
+      <span class="rule">SECRET-AWS-ACCESS-KEY</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>An AWS access key ID is embedded in the app. Anyone can extract it from the APK, and paired with the secret key it grants access to the AWS account.</p>
+<h3>Evidence</h3><pre>AKIA************LE (20 chars)</pre><h3>Location</h3><pre>classes.dex string pool</pre><h3>Fix</h3><p>Revoke and rotate the key. Never ship long-lived cloud credentials; use short-lived tokens issued by your backend (e.g. Cognito / STS).</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app performs key management according to industry best practices.">MASVS-CRYPTO-2</span><span class="masvs" title="The app prevents leakage of sensitive data.">MASVS-STORAGE-2</span>        <span class="muted">analyzer: secrets · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-high" data-sev="high" data-search="hardcoded secret: github token secret-github-token classes.dex string pool ghp_************89 (40 chars) secrets">
+    <summary>
+      <span class="badge high">high</span>
+      <span class="title">Hardcoded secret: GitHub token</span>
+      <span class="rule">SECRET-GITHUB-TOKEN</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>A GitHub personal access or OAuth token is embedded in the app.</p>
+<h3>Evidence</h3><pre>ghp_************89 (40 chars)</pre><h3>Location</h3><pre>classes.dex string pool</pre><h3>Fix</h3><p>Revoke the token at github.com/settings/tokens and rotate it.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app performs key management according to industry best practices.">MASVS-CRYPTO-2</span><span class="masvs" title="The app prevents leakage of sensitive data.">MASVS-STORAGE-2</span>        <span class="muted">analyzer: secrets · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-medium" data-sev="medium" data-search="cipher &#34;aes&#34; without mode defaults to ecb crypto-002 com.example.vulnapp.weakcrypto.run() cipher.getinstance(&#34;aes&#34;) crypto">
+    <summary>
+      <span class="badge medium">medium</span>
+      <span class="title">Cipher &#34;AES&#34; without mode defaults to ECB</span>
+      <span class="rule">CRYPTO-002</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>Cipher.getInstance(&#34;AES&#34;) falls back to AES/ECB/PKCS5Padding on Android&#39;s providers, which is not semantically secure.</p>
+<h3>Evidence</h3><pre>Cipher.getInstance(&#34;AES&#34;)</pre><h3>Location</h3><pre>com.example.vulnapp.WeakCrypto.run()</pre><h3>Fix</h3><p>Always specify the full transformation, e.g. &#34;AES/GCM/NoPadding&#34;.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app employs current strong cryptography and uses it according to industry best practices.">MASVS-CRYPTO-1</span>        <span class="muted">analyzer: crypto · confidence: medium</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-medium" data-sev="medium" data-search="weak hash function: md5 crypto-003 com.example.vulnapp.weakcrypto.run() messagedigest.getinstance(&#34;md5&#34;) crypto">
+    <summary>
+      <span class="badge medium">medium</span>
+      <span class="title">Weak hash function: MD5</span>
+      <span class="rule">CRYPTO-003</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>MD5 is collision-prone and unsuitable for passwords, signatures or integrity checks. (Harmless for non-security checksums.)</p>
+<h3>Evidence</h3><pre>MessageDigest.getInstance(&#34;MD5&#34;)</pre><h3>Location</h3><pre>com.example.vulnapp.WeakCrypto.run()</pre><h3>Fix</h3><p>Use SHA-256 or stronger; for passwords use PBKDF2/Argon2/bcrypt.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app employs current strong cryptography and uses it according to industry best practices.">MASVS-CRYPTO-1</span>        <span class="muted">analyzer: crypto · confidence: medium</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-medium" data-sev="medium" data-search="weak hash function: sha-1 crypto-003 com.example.vulnapp.weakcrypto.run() messagedigest.getinstance(&#34;sha-1&#34;) crypto">
+    <summary>
+      <span class="badge medium">medium</span>
+      <span class="title">Weak hash function: SHA-1</span>
+      <span class="rule">CRYPTO-003</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>SHA-1 is collision-prone and unsuitable for passwords, signatures or integrity checks. (Harmless for non-security checksums.)</p>
+<h3>Evidence</h3><pre>MessageDigest.getInstance(&#34;SHA-1&#34;)</pre><h3>Location</h3><pre>com.example.vulnapp.WeakCrypto.run()</pre><h3>Fix</h3><p>Use SHA-256 or stronger; for passwords use PBKDF2/Argon2/bcrypt.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app employs current strong cryptography and uses it according to industry best practices.">MASVS-CRYPTO-1</span>        <span class="muted">analyzer: crypto · confidence: medium</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-medium" data-sev="medium" data-search="static (hardcoded) iv / nonce crypto-004 com.example.vulnapp.weakcrypto.staticiv() iv derived from string literal &#34;0123**********ef (16 chars)&#34; crypto">
+    <summary>
+      <span class="badge medium">medium</span>
+      <span class="title">Static (hardcoded) IV / nonce</span>
+      <span class="rule">CRYPTO-004</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>A constant IV makes encryption deterministic: identical plaintexts yield identical ciphertexts, and with GCM, nonce reuse reveals the key stream and breaks authentication.</p>
+<h3>Evidence</h3><pre>IV derived from string literal &#34;0123**********ef (16 chars)&#34;</pre><h3>Location</h3><pre>com.example.vulnapp.WeakCrypto.staticIv()</pre><h3>Fix</h3><p>Generate a fresh random IV per message with SecureRandom (or let Cipher.init pick it) and store it alongside the ciphertext.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app employs current strong cryptography and uses it according to industry best practices.">MASVS-CRYPTO-1</span>        <span class="muted">analyzer: crypto · confidence: medium</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-medium" data-sev="medium" data-search="predictable random number generator (java.util.random) crypto-006 com.example.vulnapp.weakcrypto random used in com.example.vulnapp.weakcrypto: run() crypto">
+    <summary>
+      <span class="badge medium">medium</span>
+      <span class="title">Predictable random number generator (java.util.Random)</span>
+      <span class="rule">CRYPTO-006</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>java.util.Random / Math.random are not cryptographically secure: their output can be predicted from a few samples. Fine for game logic, dangerous for tokens, keys, salts or IVs.</p>
+<h3>Evidence</h3><pre>Random used in com.example.vulnapp.WeakCrypto: run()</pre><h3>Location</h3><pre>com.example.vulnapp.WeakCrypto</pre><h3>Fix</h3><p>Use java.security.SecureRandom for anything security-related.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app employs current strong cryptography and uses it according to industry best practices.">MASVS-CRYPTO-1</span>        <span class="muted">analyzer: crypto · confidence: medium</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-medium" data-sev="medium" data-search="app data can be extracted with adb backup manifest-002 androidmanifest.xml &lt;application&gt; &lt;application android:allowbackup=&#34;true&#34;&gt; manifest">
+    <summary>
+      <span class="badge medium">medium</span>
+      <span class="title">App data can be extracted with adb backup</span>
+      <span class="rule">MANIFEST-002</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>With backup enabled, app-private files (databases, shared preferences, tokens) can be copied off the device via &#39;adb backup&#39; or cloud backup, defeating the app sandbox.</p>
+<h3>Evidence</h3><pre>&lt;application android:allowBackup=&#34;true&#34;&gt;</pre><h3>Location</h3><pre>AndroidManifest.xml &lt;application&gt;</pre><h3>Fix</h3><p>Set android:allowBackup=&#34;false&#34;, or define precise android:dataExtractionRules / fullBackupContent exclusions for sensitive files.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app prevents leakage of sensitive data.">MASVS-STORAGE-2</span>        <span class="muted">analyzer: manifest · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-medium" data-sev="medium" data-search="cleartext (http) traffic explicitly allowed manifest-003 androidmanifest.xml &lt;application&gt; &lt;application android:usescleartexttraffic=&#34;true&#34;&gt; manifest">
+    <summary>
+      <span class="badge medium">medium</span>
+      <span class="title">Cleartext (HTTP) traffic explicitly allowed</span>
+      <span class="rule">MANIFEST-003</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>android:usesCleartextTraffic is true, so the app may send data over unencrypted HTTP where an on-path attacker can read or modify it.</p>
+<h3>Evidence</h3><pre>&lt;application android:usesCleartextTraffic=&#34;true&#34;&gt;</pre><h3>Location</h3><pre>AndroidManifest.xml &lt;application&gt;</pre><h3>Fix</h3><p>Use HTTPS everywhere and set usesCleartextTraffic to false, or restrict exceptions in network_security_config.xml.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app secures all network traffic according to the current best practices.">MASVS-NETWORK-1</span>        <span class="muted">analyzer: manifest · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-medium" data-sev="medium" data-search="low minsdkversion (15) manifest-004 androidmanifest.xml &lt;uses-sdk&gt; android:minsdkversion=15 manifest">
+    <summary>
+      <span class="badge medium">medium</span>
+      <span class="title">Low minSdkVersion (15)</span>
+      <span class="rule">MANIFEST-004</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>The app installs on old Android releases that lack modern platform security fixes and protections (e.g. TLS 1.2 defaults, network security config, runtime permissions).</p>
+<h3>Evidence</h3><pre>android:minSdkVersion=15</pre><h3>Location</h3><pre>AndroidManifest.xml &lt;uses-sdk&gt;</pre><h3>Fix</h3><p>Raise minSdkVersion to at least 24.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app requires an up-to-date platform version.">MASVS-CODE-1</span>        <span class="muted">analyzer: manifest · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-medium" data-sev="medium" data-search="exported activity without permission: paymentactivity manifest-006 androidmanifest.xml &lt;activity com.example.vulnapp.paymentactivity&gt; &lt;activity android:name=&#34;com.example.vulnapp.paymentactivity&#34;&gt; exported, no permission manifest">
+    <summary>
+      <span class="badge medium">medium</span>
+      <span class="title">Exported activity without permission: PaymentActivity</span>
+      <span class="rule">MANIFEST-006</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>This activity is reachable by any app on the device because android:exported is true, and no android:permission protects it. Untrusted callers can send it crafted intents.</p>
+<h3>Evidence</h3><pre>&lt;activity android:name=&#34;com.example.vulnapp.PaymentActivity&#34;&gt; exported, no permission</pre><h3>Location</h3><pre>AndroidManifest.xml &lt;activity com.example.vulnapp.PaymentActivity&gt;</pre><h3>Fix</h3><p>Set android:exported=&#34;false&#34; unless external access is required; otherwise guard it with a signature-level android:permission and validate all incoming data.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app uses IPC mechanisms securely.">MASVS-PLATFORM-1</span>        <span class="muted">analyzer: manifest · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-medium" data-sev="medium" data-search="exported service without permission: syncservice manifest-006 androidmanifest.xml &lt;service com.example.vulnapp.syncservice&gt; &lt;service android:name=&#34;com.example.vulnapp.syncservice&#34;&gt; exported, no permission manifest">
+    <summary>
+      <span class="badge medium">medium</span>
+      <span class="title">Exported service without permission: SyncService</span>
+      <span class="rule">MANIFEST-006</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>This service is reachable by any app on the device because android:exported is true, and no android:permission protects it. Untrusted callers can send it crafted intents.</p>
+<h3>Evidence</h3><pre>&lt;service android:name=&#34;com.example.vulnapp.SyncService&#34;&gt; exported, no permission</pre><h3>Location</h3><pre>AndroidManifest.xml &lt;service com.example.vulnapp.SyncService&gt;</pre><h3>Fix</h3><p>Set android:exported=&#34;false&#34; unless external access is required; otherwise guard it with a signature-level android:permission and validate all incoming data.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app uses IPC mechanisms securely.">MASVS-PLATFORM-1</span>        <span class="muted">analyzer: manifest · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-medium" data-sev="medium" data-search="sensitive permission requested: read_sms manifest-007 androidmanifest.xml &lt;uses-permission&gt; &lt;uses-permission android:name=&#34;android.permission.read_sms&#34;&gt; manifest">
+    <summary>
+      <span class="badge medium">medium</span>
+      <span class="title">Sensitive permission requested: READ_SMS</span>
+      <span class="rule">MANIFEST-007</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>Can read or send SMS, a common vector for OTP theft and premium-rate fraud. Request only what the app needs and justify it in the privacy policy.</p>
+<h3>Evidence</h3><pre>&lt;uses-permission android:name=&#34;android.permission.READ_SMS&#34;&gt;</pre><h3>Location</h3><pre>AndroidManifest.xml &lt;uses-permission&gt;</pre><h3>Fix</h3><p>Remove the permission if unused; request dangerous permissions at runtime, in context.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app minimizes access to sensitive data and resources.">MASVS-PRIVACY-1</span>        <span class="muted">analyzer: manifest · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-medium" data-sev="medium" data-search="cleartext traffic permitted for all domains network-004 res/xml/network_security_config.xml &lt;base-config cleartexttrafficpermitted=&#34;true&#34;&gt; network">
+    <summary>
+      <span class="badge medium">medium</span>
+      <span class="title">Cleartext traffic permitted for all domains</span>
+      <span class="rule">NETWORK-004</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>&lt;base-config cleartextTrafficPermitted=&#34;true&#34;&gt; allows plain HTTP to every domain.</p>
+<h3>Evidence</h3><pre>&lt;base-config cleartextTrafficPermitted=&#34;true&#34;&gt;</pre><h3>Location</h3><pre>res/xml/network_security_config.xml</pre><h3>Fix</h3><p>Set cleartextTrafficPermitted to false and use HTTPS.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app secures all network traffic according to the current best practices.">MASVS-NETWORK-1</span>        <span class="muted">analyzer: network · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-medium" data-sev="medium" data-search="hardcoded secret: google api key secret-google-api-key resources.arsc string/google_api_key aiza************34 (39 chars) secrets">
+    <summary>
+      <span class="badge medium">medium</span>
+      <span class="title">Hardcoded secret: Google API key</span>
+      <span class="rule">SECRET-GOOGLE-API-KEY</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>A Google API key is embedded in the app. Such keys are often meant to be public (Maps, Firebase) but are abusable and billable if not restricted.</p>
+<h3>Evidence</h3><pre>AIza************34 (39 chars)</pre><h3>Location</h3><pre>resources.arsc string/google_api_key</pre><h3>Fix</h3><p>In Google Cloud Console restrict the key to your app&#39;s package name and SHA-1 fingerprint and to only the APIs it needs.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app prevents leakage of sensitive data.">MASVS-STORAGE-2</span><span class="masvs" title="The app performs key management according to industry best practices.">MASVS-CRYPTO-2</span>        <span class="muted">analyzer: secrets · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-medium" data-sev="medium" data-search="hardcoded secret: json web token secret-jwt classes.dex string pool eyjh************5c (127 chars) secrets">
+    <summary>
+      <span class="badge medium">medium</span>
+      <span class="title">Hardcoded secret: JSON Web Token</span>
+      <span class="rule">SECRET-JWT</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>A hardcoded JWT is present. If it is a real, unexpired token it lets anyone act as its subject; even expired tokens leak claims.</p>
+<h3>Evidence</h3><pre>eyJh************5c (127 chars)</pre><h3>Location</h3><pre>classes.dex string pool</pre><h3>Fix</h3><p>Remove the token and issue tokens at login. Decode it to check for sensitive claims.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app prevents leakage of sensitive data.">MASVS-STORAGE-2</span><span class="masvs" title="The app uses secure authentication and authorization protocols and follows the relevant best practices.">MASVS-AUTH-1</span>        <span class="muted">analyzer: secrets · confidence: medium</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-low" data-sev="low" data-search="outdated targetsdkversion (28) manifest-005 androidmanifest.xml &lt;uses-sdk&gt; android:targetsdkversion=28 manifest">
+    <summary>
+      <span class="badge low">low</span>
+      <span class="title">Outdated targetSdkVersion (28)</span>
+      <span class="rule">MANIFEST-005</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>Targeting an old API level opts the app out of newer platform hardening (scoped storage, implicit-export rules, background limits).</p>
+<h3>Evidence</h3><pre>android:targetSdkVersion=28</pre><h3>Location</h3><pre>AndroidManifest.xml &lt;uses-sdk&gt;</pre><h3>Fix</h3><p>Target API 30 or newer.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app requires an up-to-date platform version.">MASVS-CODE-1</span>        <span class="muted">analyzer: manifest · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-low" data-sev="low" data-search="sensitive permission requested: camera manifest-007 androidmanifest.xml &lt;uses-permission&gt; &lt;uses-permission android:name=&#34;android.permission.camera&#34;&gt; manifest">
+    <summary>
+      <span class="badge low">low</span>
+      <span class="title">Sensitive permission requested: CAMERA</span>
+      <span class="rule">MANIFEST-007</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>Captures camera or microphone input; verify it is needed and user-visible. Request only what the app needs and justify it in the privacy policy.</p>
+<h3>Evidence</h3><pre>&lt;uses-permission android:name=&#34;android.permission.CAMERA&#34;&gt;</pre><h3>Location</h3><pre>AndroidManifest.xml &lt;uses-permission&gt;</pre><h3>Fix</h3><p>Remove the permission if unused; request dangerous permissions at runtime, in context.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app minimizes access to sensitive data and resources.">MASVS-PRIVACY-1</span>        <span class="muted">analyzer: manifest · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-low" data-sev="low" data-search="sensitive permission requested: access_fine_location manifest-007 androidmanifest.xml &lt;uses-permission&gt; &lt;uses-permission android:name=&#34;android.permission.access_fine_location&#34;&gt; manifest">
+    <summary>
+      <span class="badge low">low</span>
+      <span class="title">Sensitive permission requested: ACCESS_FINE_LOCATION</span>
+      <span class="rule">MANIFEST-007</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>Collects the user&#39;s location. Request only what the app needs and justify it in the privacy policy.</p>
+<h3>Evidence</h3><pre>&lt;uses-permission android:name=&#34;android.permission.ACCESS_FINE_LOCATION&#34;&gt;</pre><h3>Location</h3><pre>AndroidManifest.xml &lt;uses-permission&gt;</pre><h3>Fix</h3><p>Remove the permission if unused; request dangerous permissions at runtime, in context.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app minimizes access to sensitive data and resources.">MASVS-PRIVACY-1</span>        <span class="muted">analyzer: manifest · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-low" data-sev="low" data-search="sensitive permission requested: write_external_storage manifest-007 androidmanifest.xml &lt;uses-permission&gt; &lt;uses-permission android:name=&#34;android.permission.write_external_storage&#34;&gt; manifest">
+    <summary>
+      <span class="badge low">low</span>
+      <span class="title">Sensitive permission requested: WRITE_EXTERNAL_STORAGE</span>
+      <span class="rule">MANIFEST-007</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>Shared storage is readable by other apps; never put secrets there. Request only what the app needs and justify it in the privacy policy.</p>
+<h3>Evidence</h3><pre>&lt;uses-permission android:name=&#34;android.permission.WRITE_EXTERNAL_STORAGE&#34;&gt;</pre><h3>Location</h3><pre>AndroidManifest.xml &lt;uses-permission&gt;</pre><h3>Fix</h3><p>Remove the permission if unused; request dangerous permissions at runtime, in context.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app prevents leakage of sensitive data.">MASVS-STORAGE-2</span><span class="masvs" title="The app minimizes access to sensitive data and resources.">MASVS-PRIVACY-1</span>        <span class="muted">analyzer: manifest · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-low" data-sev="low" data-search="cleartext traffic permitted for legacy.example.com network-004 res/xml/network_security_config.xml &lt;domain-config cleartexttrafficpermitted=&#34;true&#34;&gt; legacy.example.com network">
+    <summary>
+      <span class="badge low">low</span>
+      <span class="title">Cleartext traffic permitted for legacy.example.com</span>
+      <span class="rule">NETWORK-004</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>A &lt;domain-config&gt; opts specific domains into plain HTTP.</p>
+<h3>Evidence</h3><pre>&lt;domain-config cleartextTrafficPermitted=&#34;true&#34;&gt; legacy.example.com</pre><h3>Location</h3><pre>res/xml/network_security_config.xml</pre><h3>Fix</h3><p>Migrate these hosts to HTTPS and remove the exception.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app secures all network traffic according to the current best practices.">MASVS-NETWORK-1</span>        <span class="muted">analyzer: network · confidence: high</span>
+      </p>
+    </div>
+  </details>
+  <details class="finding s-info" data-sev="info" data-search="no certificate pinning detected network-007   network">
+    <summary>
+      <span class="badge info">info</span>
+      <span class="title">No certificate pinning detected</span>
+      <span class="rule">NETWORK-007</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>Neither a &lt;pin-set&gt; in the network security config nor a known pinning library (OkHttp CertificatePinner, TrustKit) was found. Without pinning a rogue or compromised CA can intercept traffic to your backend.</p>
+<h3>Fix</h3><p>For apps handling sensitive data, pin your backend&#39;s public key (&lt;pin-set&gt;) and include a backup pin.</p>      <h3>Classification</h3>
+      <p>
+<span class="masvs" title="The app performs identity pinning for all remote endpoints under the developer&#39;s control.">MASVS-NETWORK-2</span>        <span class="muted">analyzer: network · confidence: low</span>
+      </p>
+    </div>
+  </details>
+</div>
+<p class="empty" id="none" hidden>No findings match the current filter.</p>
+
+<footer>
+  Generated by apk-sentinel 0.1.0. Static analysis is heuristic: findings
+  may include false positives and cannot see runtime behaviour or server-side flaws. Use only on
+  apps you own or have explicit permission to test.
+</footer>
+</div>
+
+<script>
+(function () {
+  var q = document.getElementById("q");
+  if (!q) return;
+  var chips = Array.prototype.slice.call(document.querySelectorAll(".chip"));
+  var items = Array.prototype.slice.call(document.querySelectorAll("details.finding"));
+  var none = document.getElementById("none");
+  function apply() {
+    var on = {};
+    chips.forEach(function (c) { on[c.dataset.sev] = c.getAttribute("aria-pressed") === "true"; });
+    var term = q.value.trim().toLowerCase(), shown = 0;
+    items.forEach(function (el) {
+      var ok = on[el.dataset.sev] && (!term || el.dataset.search.indexOf(term) !== -1);
+      el.hidden = !ok; if (ok) shown++;
+    });
+    none.hidden = shown !== 0;
+  }
+  chips.forEach(function (c) {
+    c.addEventListener("click", function () {
+      c.setAttribute("aria-pressed", c.getAttribute("aria-pressed") === "true" ? "false" : "true");
+      apply();
+    });
+  });
+  q.addEventListener("input", apply);
+})();
+</script>
+</body>
+</html>

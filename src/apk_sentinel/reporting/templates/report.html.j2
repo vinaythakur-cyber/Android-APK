@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>apk-sentinel report: {{ target.package }}</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --surface: #ffffff; --text: #1b1f24; --muted: #596270;
+    --border: #dde1e6; --code-bg: #f0f2f5; --accent: #1d4ed8; --accent-fg: #ffffff;
+    --critical: #9f1239; --high: #b91c1c; --medium: #92400e; --low: #1d4ed8; --info: #475569;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1216; --surface: #181c22; --text: #e6e9ed; --muted: #9aa4b1;
+      --border: #2b323b; --code-bg: #10141a; --accent: #7aa2ff; --accent-fg: #0b1220;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  h2 { font-size: 1.15rem; margin: 32px 0 12px; }
+  .muted { color: var(--muted); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; }
+  .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px 24px;
+    margin-top: 14px; }
+  .meta dt { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--muted); }
+  .meta dd { margin: 0 0 6px; word-break: break-all; font-variant-numeric: tabular-nums; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-left-width: 5px;
+    border-radius: 8px; padding: 10px 12px; }
+  .tile b { display: block; font-size: 1.7rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .tile span { font-size: .78rem; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--muted); }
+  .t-critical { border-left-color: var(--critical); } .t-high { border-left-color: var(--high); }
+  .t-medium { border-left-color: var(--medium); } .t-low { border-left-color: var(--low); }
+  .t-info { border-left-color: var(--info); }
+  .bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin-top: 14px;
+    background: var(--border); }
+  .bar i { display: block; height: 100%; }
+  .b-critical { background: var(--critical); } .b-high { background: var(--high); }
+  .b-medium { background: var(--medium); } .b-low { background: var(--low); }
+  .b-info { background: var(--info); }
+  .banner { border: 1px solid var(--high); background: var(--surface); border-radius: 8px;
+    padding: 10px 14px; margin-top: 16px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .toolbar input[type=search] { flex: 1 1 220px; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; }
+  .chip { cursor: pointer; user-select: none; border: 1px solid var(--border); border-radius: 999px;
+    padding: 3px 12px; background: var(--surface); font-size: .85rem; }
+  .chip[aria-pressed=true] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+  details.finding { background: var(--surface); border: 1px solid var(--border);
+    border-left-width: 5px; border-radius: 8px; margin-bottom: 8px; }
+  details.finding > summary { cursor: pointer; padding: 10px 14px; list-style: none; display: flex;
+    gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  details.finding > summary::-webkit-details-marker { display: none; }
+  details.finding > summary::before { content: "\25B8"; color: var(--muted); }
+  details.finding[open] > summary::before { content: "\25BE"; }
+  .s-critical { border-left-color: var(--critical); } .s-high { border-left-color: var(--high); }
+  .s-medium { border-left-color: var(--medium); } .s-low { border-left-color: var(--low); }
+  .s-info { border-left-color: var(--info); }
+  .badge { color: #fff; font-size: .7rem; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; padding: 2px 8px; border-radius: 4px; }
+  .badge.critical { background: var(--critical); } .badge.high { background: var(--high); }
+  .badge.medium { background: var(--medium); } .badge.low { background: var(--low); }
+  .badge.info { background: var(--info); }
+  .title { font-weight: 600; }
+  .rule { font-size: .8rem; color: var(--muted); font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .body { padding: 0 14px 14px 29px; }
+  .body h3 { margin: 12px 0 2px; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--muted); }
+  .body p { margin: 0; }
+  pre, code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .85rem; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 10px; margin: 0; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+  .masvs { display: inline-block; margin: 2px 6px 2px 0; padding: 1px 8px; border-radius: 4px;
+    border: 1px solid var(--border); background: var(--code-bg); font-size: .8rem;
+    font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  td code { white-space: nowrap; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border);
+    vertical-align: top; }
+  th { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .empty { text-align: center; padding: 32px; color: var(--muted); }
+  footer { margin-top: 40px; font-size: .82rem; color: var(--muted); }
+  [hidden] { display: none !important; }
+  @media print { details.finding > .body { display: block; } .toolbar { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>apk-sentinel report</h1>
+  <div class="muted">Static analysis of <b>{{ target.package }}</b>
+    {% if target.version_name %}v{{ target.version_name }}{% endif %}</div>
+  <div class="card meta">
+    <div><dt>File</dt><dd>{{ target.file_name }}</dd></div>
+    <div><dt>SHA-256</dt><dd>{{ target.sha256 }}</dd></div>
+    <div><dt>Size</dt><dd>{{ "{:,}".format(target.size_bytes) }} bytes</dd></div>
+    <div><dt>minSdk / targetSdk</dt><dd>{{ target.min_sdk if target.min_sdk is not none else "?" }} /
+      {{ target.target_sdk if target.target_sdk is not none else "?" }}</dd></div>
+    <div><dt>Scanned</dt><dd>{{ scanned_at }}</dd></div>
+    <div><dt>Tool</dt><dd>apk-sentinel {{ result.tool_version }}
+      ({{ "%.2f"|format(result.duration_seconds) }}s)</dd></div>
+  </div>
+</header>
+
+<h2>Summary</h2>
+<div class="tiles">
+  {% for s in severities %}
+  <div class="tile t-{{ s.name }}"><b>{{ s.count }}</b><span>{{ s.name }}</span></div>
+  {% endfor %}
+</div>
+{% if total %}
+<div class="bar" role="img"
+     aria-label="Findings by severity: {% for s in severities %}{{ s.count }} {{ s.name }}{{ ', ' if not loop.last }}{% endfor %}">
+  {% for s in severities if s.count %}<i class="b-{{ s.name }}" style="width: {{ s.percent }}%"></i>{% endfor %}
+</div>
+{% endif %}
+
+{% if result.errors %}
+<div class="banner" role="alert">
+  <b>{{ result.errors|length }} analyzer(s) failed; results below are incomplete.</b>
+  <ul>
+  {% for e in result.errors %}<li><code>{{ e.analyzer }}</code>: {{ e.message }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if masvs_rows %}
+<h2>OWASP MASVS v2 coverage</h2>
+<div class="card tablewrap">
+  <table>
+    <thead><tr><th>Control</th><th>Requirement</th><th>Findings</th><th>Worst</th></tr></thead>
+    <tbody>
+    {% for row in masvs_rows %}
+      <tr><td><code>{{ row.control_id }}</code></td><td>{{ row.statement }}</td>
+          <td>{{ row.count }}</td><td><span class="badge {{ row.worst.value }}">{{ row.worst.value }}</span></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<h2>Findings ({{ total }})</h2>
+{% if total %}
+<div class="toolbar" id="toolbar">
+  <input type="search" id="q" placeholder="Search title, rule, location, evidence…" aria-label="Search findings">
+  {% for s in severities if s.count %}
+  <button type="button" class="chip" data-sev="{{ s.name }}" aria-pressed="true">{{ s.name }} ({{ s.count }})</button>
+  {% endfor %}
+</div>
+<div id="findings">
+{% for f in findings %}
+  <details class="finding s-{{ f.severity }}" data-sev="{{ f.severity }}" data-search="{{ f.search }}">
+    <summary>
+      <span class="badge {{ f.severity }}">{{ f.severity }}</span>
+      <span class="title">{{ f.title }}</span>
+      <span class="rule">{{ f.rule_id }}</span>
+    </summary>
+    <div class="body">
+      <h3>What</h3><p>{{ f.description }}</p>
+      {% if f.evidence %}<h3>Evidence</h3><pre>{{ f.evidence }}</pre>{% endif %}
+      {% if f.location %}<h3>Location</h3><pre>{{ f.location }}</pre>{% endif %}
+      {% if f.recommendation %}<h3>Fix</h3><p>{{ f.recommendation }}</p>{% endif %}
+      <h3>Classification</h3>
+      <p>
+        {% for cid, text in f.masvs %}<span class="masvs" title="{{ text }}">{{ cid }}</span>{% endfor %}
+        <span class="muted">analyzer: {{ f.analyzer }} · confidence: {{ f.confidence }}</span>
+      </p>
+    </div>
+  </details>
+{% endfor %}
+</div>
+<p class="empty" id="none" hidden>No findings match the current filter.</p>
+{% else %}
+<div class="card empty">No findings. That does not prove the app is secure: this tool performs a
+limited set of static checks.</div>
+{% endif %}
+
+<footer>
+  Generated by apk-sentinel {{ result.tool_version }}. Static analysis is heuristic: findings
+  may include false positives and cannot see runtime behaviour or server-side flaws. Use only on
+  apps you own or have explicit permission to test.
+</footer>
+</div>
+
+<script>
+(function () {
+  var q = document.getElementById("q");
+  if (!q) return;
+  var chips = Array.prototype.slice.call(document.querySelectorAll(".chip"));
+  var items = Array.prototype.slice.call(document.querySelectorAll("details.finding"));
+  var none = document.getElementById("none");
+  function apply() {
+    var on = {};
+    chips.forEach(function (c) { on[c.dataset.sev] = c.getAttribute("aria-pressed") === "true"; });
+    var term = q.value.trim().toLowerCase(), shown = 0;
+    items.forEach(function (el) {
+      var ok = on[el.dataset.sev] && (!term || el.dataset.search.indexOf(term) !== -1);
+      el.hidden = !ok; if (ok) shown++;
+    });
+    none.hidden = shown !== 0;
+  }
+  chips.forEach(function (c) {
+    c.addEventListener("click", function () {
+      c.setAttribute("aria-pressed", c.getAttribute("aria-pressed") === "true" ? "false" : "true");
+      apply();
+    });
+  });
+  q.addEventListener("input", apply);
+})();
+</script>
+</body>
+</html>

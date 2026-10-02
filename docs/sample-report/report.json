@@ -1,0 +1,491 @@
+{
+  "tool": {
+    "name": "apk-sentinel",
+    "version": "0.1.0"
+  },
+  "scanned_at": "2026-10-02T08:55:25.915547+00:00",
+  "duration_seconds": 0.021,
+  "target": {
+    "file_name": "vulnapp.apk",
+    "sha256": "60577e0508130efc18e702c9a82827a79675a5da70f536ea69baa68957967c7c",
+    "size_bytes": 3742,
+    "package": "com.example.vulnapp",
+    "version_name": "1.0",
+    "version_code": "1",
+    "min_sdk": 15,
+    "target_sdk": 28
+  },
+  "summary": {
+    "total": 32,
+    "by_severity": {
+      "critical": 1,
+      "high": 11,
+      "medium": 14,
+      "low": 5,
+      "info": 1
+    }
+  },
+  "analyzers_run": [
+    "manifest",
+    "secrets",
+    "crypto",
+    "network"
+  ],
+  "errors": [],
+  "findings": [
+    {
+      "rule_id": "SECRET-PRIVATE-KEY",
+      "title": "Hardcoded secret: Private key material",
+      "severity": "critical",
+      "confidence": "high",
+      "analyzer": "secrets",
+      "description": "A PEM private key header was found in the app's strings. Private keys must never leave the server or the platform keystore.",
+      "evidence": "-----BEGIN RSA PRIVATE KEY-----",
+      "location": "classes.dex string pool",
+      "recommendation": "Revoke the key pair, generate a new one, and keep private keys server-side or in the Android Keystore.",
+      "masvs": [
+        "MASVS-CRYPTO-2"
+      ]
+    },
+    {
+      "rule_id": "CRYPTO-001",
+      "title": "Weak cipher algorithm: DES",
+      "severity": "high",
+      "confidence": "high",
+      "analyzer": "crypto",
+      "description": "DES has a 56-bit key and can be brute-forced in hours.",
+      "evidence": "\"DES/ECB/PKCS5Padding\"",
+      "location": "com.example.vulnapp.WeakCrypto.run()",
+      "recommendation": "Use AES-256-GCM (or ChaCha20-Poly1305) via the Android Keystore.",
+      "masvs": [
+        "MASVS-CRYPTO-1"
+      ]
+    },
+    {
+      "rule_id": "CRYPTO-002",
+      "title": "ECB block-cipher mode",
+      "severity": "high",
+      "confidence": "high",
+      "analyzer": "crypto",
+      "description": "ECB encrypts identical plaintext blocks to identical ciphertext blocks, leaking structure and allowing block rearrangement.",
+      "evidence": "Cipher.getInstance(\"DES/ECB/PKCS5Padding\")",
+      "location": "com.example.vulnapp.WeakCrypto.run()",
+      "recommendation": "Use an authenticated mode such as AES/GCM/NoPadding with a fresh random IV for every message.",
+      "masvs": [
+        "MASVS-CRYPTO-1"
+      ]
+    },
+    {
+      "rule_id": "CRYPTO-005",
+      "title": "Hardcoded encryption key",
+      "severity": "high",
+      "confidence": "medium",
+      "analyzer": "crypto",
+      "description": "The symmetric key is embedded in the app. Anyone can extract it from the APK and decrypt all data protected by it.",
+      "evidence": "SecretKeySpec built from string literal \"MySu***********y1 (17 chars)\"",
+      "location": "com.example.vulnapp.WeakCrypto.hardKey()",
+      "recommendation": "Generate keys at runtime inside the Android Keystore; never ship key material in code or resources.",
+      "masvs": [
+        "MASVS-CRYPTO-2"
+      ]
+    },
+    {
+      "rule_id": "MANIFEST-001",
+      "title": "Application is debuggable",
+      "severity": "high",
+      "confidence": "high",
+      "analyzer": "manifest",
+      "description": "android:debuggable is true. Anyone with USB access can attach a debugger, run commands as the app (run-as), read its private data and bypass client-side checks.",
+      "evidence": "<application android:debuggable=\"true\">",
+      "location": "AndroidManifest.xml <application>",
+      "recommendation": "Never ship debuggable builds. Remove the attribute; release build types set it to false by default.",
+      "masvs": [
+        "MASVS-RESILIENCE-4"
+      ]
+    },
+    {
+      "rule_id": "MANIFEST-006",
+      "title": "Exported provider without permission: NotesProvider",
+      "severity": "high",
+      "confidence": "high",
+      "analyzer": "manifest",
+      "description": "This provider is reachable by any app on the device because android:exported is true, and no android:permission protects it. Untrusted callers can send it crafted intents. Any app can query this provider's data.",
+      "evidence": "<provider android:name=\"com.example.vulnapp.NotesProvider\"> exported, no permission",
+      "location": "AndroidManifest.xml <provider com.example.vulnapp.NotesProvider>",
+      "recommendation": "Set android:exported=\"false\" unless external access is required; otherwise guard it with a signature-level android:permission and validate all incoming data.",
+      "masvs": [
+        "MASVS-PLATFORM-1"
+      ]
+    },
+    {
+      "rule_id": "NETWORK-001",
+      "title": "TrustManager accepts any server certificate",
+      "severity": "high",
+      "confidence": "high",
+      "analyzer": "network",
+      "description": "checkServerTrusted() has an empty body, so TLS certificates are never validated. A network attacker can impersonate any server and read or modify supposedly encrypted traffic (man-in-the-middle).",
+      "evidence": "com.example.vulnapp.TrustAll implements X509TrustManager; checkServerTrusted is empty",
+      "location": "com.example.vulnapp.TrustAll.checkServerTrusted()",
+      "recommendation": "Delete the custom TrustManager and use the platform default. To trust a private CA, add it via network_security_config.xml; to pin, use <pin-set>.",
+      "masvs": [
+        "MASVS-NETWORK-1"
+      ]
+    },
+    {
+      "rule_id": "NETWORK-002",
+      "title": "HostnameVerifier accepts every hostname",
+      "severity": "high",
+      "confidence": "high",
+      "analyzer": "network",
+      "description": "verify() unconditionally returns true, so a valid certificate issued for *any* domain is accepted for *every* domain, enabling man-in-the-middle attacks.",
+      "evidence": "com.example.vulnapp.AllowAllVerifier.verify(...) always returns true",
+      "location": "com.example.vulnapp.AllowAllVerifier.verify()",
+      "recommendation": "Use the default HostnameVerifier (HttpsURLConnection.getDefaultHostnameVerifier()).",
+      "masvs": [
+        "MASVS-NETWORK-1"
+      ]
+    },
+    {
+      "rule_id": "NETWORK-003",
+      "title": "WebView ignores SSL errors (handler.proceed())",
+      "severity": "high",
+      "confidence": "high",
+      "analyzer": "network",
+      "description": "onReceivedSslError calls SslErrorHandler.proceed(), continuing to load pages that failed certificate validation. Attackers can inject content into the WebView.",
+      "evidence": "com.example.vulnapp.LaxWebViewClient.onReceivedSslError calls handler.proceed()",
+      "location": "com.example.vulnapp.LaxWebViewClient.onReceivedSslError()",
+      "recommendation": "Call handler.cancel() and show an error instead.",
+      "masvs": [
+        "MASVS-NETWORK-1",
+        "MASVS-PLATFORM-2"
+      ]
+    },
+    {
+      "rule_id": "NETWORK-005",
+      "title": "User-installed CAs are trusted",
+      "severity": "high",
+      "confidence": "high",
+      "analyzer": "network",
+      "description": "A <certificates src=\"user\"> trust anchor makes the app accept certificates from CAs the device user installed, which is how interception proxies (and malware) MITM TLS.",
+      "evidence": "<base-config> ... <certificates src=\"user\"/>",
+      "location": "res/xml/network_security_config.xml",
+      "recommendation": "Trust only system CAs in release builds; limit user CAs to <debug-overrides>.",
+      "masvs": [
+        "MASVS-NETWORK-1"
+      ]
+    },
+    {
+      "rule_id": "SECRET-AWS-ACCESS-KEY",
+      "title": "Hardcoded secret: AWS access key ID",
+      "severity": "high",
+      "confidence": "high",
+      "analyzer": "secrets",
+      "description": "An AWS access key ID is embedded in the app. Anyone can extract it from the APK, and paired with the secret key it grants access to the AWS account.",
+      "evidence": "AKIA************LE (20 chars)",
+      "location": "classes.dex string pool",
+      "recommendation": "Revoke and rotate the key. Never ship long-lived cloud credentials; use short-lived tokens issued by your backend (e.g. Cognito / STS).",
+      "masvs": [
+        "MASVS-CRYPTO-2",
+        "MASVS-STORAGE-2"
+      ]
+    },
+    {
+      "rule_id": "SECRET-GITHUB-TOKEN",
+      "title": "Hardcoded secret: GitHub token",
+      "severity": "high",
+      "confidence": "high",
+      "analyzer": "secrets",
+      "description": "A GitHub personal access or OAuth token is embedded in the app.",
+      "evidence": "ghp_************89 (40 chars)",
+      "location": "classes.dex string pool",
+      "recommendation": "Revoke the token at github.com/settings/tokens and rotate it.",
+      "masvs": [
+        "MASVS-CRYPTO-2",
+        "MASVS-STORAGE-2"
+      ]
+    },
+    {
+      "rule_id": "CRYPTO-002",
+      "title": "Cipher \"AES\" without mode defaults to ECB",
+      "severity": "medium",
+      "confidence": "medium",
+      "analyzer": "crypto",
+      "description": "Cipher.getInstance(\"AES\") falls back to AES/ECB/PKCS5Padding on Android's providers, which is not semantically secure.",
+      "evidence": "Cipher.getInstance(\"AES\")",
+      "location": "com.example.vulnapp.WeakCrypto.run()",
+      "recommendation": "Always specify the full transformation, e.g. \"AES/GCM/NoPadding\".",
+      "masvs": [
+        "MASVS-CRYPTO-1"
+      ]
+    },
+    {
+      "rule_id": "CRYPTO-003",
+      "title": "Weak hash function: MD5",
+      "severity": "medium",
+      "confidence": "medium",
+      "analyzer": "crypto",
+      "description": "MD5 is collision-prone and unsuitable for passwords, signatures or integrity checks. (Harmless for non-security checksums.)",
+      "evidence": "MessageDigest.getInstance(\"MD5\")",
+      "location": "com.example.vulnapp.WeakCrypto.run()",
+      "recommendation": "Use SHA-256 or stronger; for passwords use PBKDF2/Argon2/bcrypt.",
+      "masvs": [
+        "MASVS-CRYPTO-1"
+      ]
+    },
+    {
+      "rule_id": "CRYPTO-003",
+      "title": "Weak hash function: SHA-1",
+      "severity": "medium",
+      "confidence": "medium",
+      "analyzer": "crypto",
+      "description": "SHA-1 is collision-prone and unsuitable for passwords, signatures or integrity checks. (Harmless for non-security checksums.)",
+      "evidence": "MessageDigest.getInstance(\"SHA-1\")",
+      "location": "com.example.vulnapp.WeakCrypto.run()",
+      "recommendation": "Use SHA-256 or stronger; for passwords use PBKDF2/Argon2/bcrypt.",
+      "masvs": [
+        "MASVS-CRYPTO-1"
+      ]
+    },
+    {
+      "rule_id": "CRYPTO-004",
+      "title": "Static (hardcoded) IV / nonce",
+      "severity": "medium",
+      "confidence": "medium",
+      "analyzer": "crypto",
+      "description": "A constant IV makes encryption deterministic: identical plaintexts yield identical ciphertexts, and with GCM, nonce reuse reveals the key stream and breaks authentication.",
+      "evidence": "IV derived from string literal \"0123**********ef (16 chars)\"",
+      "location": "com.example.vulnapp.WeakCrypto.staticIv()",
+      "recommendation": "Generate a fresh random IV per message with SecureRandom (or let Cipher.init pick it) and store it alongside the ciphertext.",
+      "masvs": [
+        "MASVS-CRYPTO-1"
+      ]
+    },
+    {
+      "rule_id": "CRYPTO-006",
+      "title": "Predictable random number generator (java.util.Random)",
+      "severity": "medium",
+      "confidence": "medium",
+      "analyzer": "crypto",
+      "description": "java.util.Random / Math.random are not cryptographically secure: their output can be predicted from a few samples. Fine for game logic, dangerous for tokens, keys, salts or IVs.",
+      "evidence": "Random used in com.example.vulnapp.WeakCrypto: run()",
+      "location": "com.example.vulnapp.WeakCrypto",
+      "recommendation": "Use java.security.SecureRandom for anything security-related.",
+      "masvs": [
+        "MASVS-CRYPTO-1"
+      ]
+    },
+    {
+      "rule_id": "MANIFEST-002",
+      "title": "App data can be extracted with adb backup",
+      "severity": "medium",
+      "confidence": "high",
+      "analyzer": "manifest",
+      "description": "With backup enabled, app-private files (databases, shared preferences, tokens) can be copied off the device via 'adb backup' or cloud backup, defeating the app sandbox.",
+      "evidence": "<application android:allowBackup=\"true\">",
+      "location": "AndroidManifest.xml <application>",
+      "recommendation": "Set android:allowBackup=\"false\", or define precise android:dataExtractionRules / fullBackupContent exclusions for sensitive files.",
+      "masvs": [
+        "MASVS-STORAGE-2"
+      ]
+    },
+    {
+      "rule_id": "MANIFEST-003",
+      "title": "Cleartext (HTTP) traffic explicitly allowed",
+      "severity": "medium",
+      "confidence": "high",
+      "analyzer": "manifest",
+      "description": "android:usesCleartextTraffic is true, so the app may send data over unencrypted HTTP where an on-path attacker can read or modify it.",
+      "evidence": "<application android:usesCleartextTraffic=\"true\">",
+      "location": "AndroidManifest.xml <application>",
+      "recommendation": "Use HTTPS everywhere and set usesCleartextTraffic to false, or restrict exceptions in network_security_config.xml.",
+      "masvs": [
+        "MASVS-NETWORK-1"
+      ]
+    },
+    {
+      "rule_id": "MANIFEST-004",
+      "title": "Low minSdkVersion (15)",
+      "severity": "medium",
+      "confidence": "high",
+      "analyzer": "manifest",
+      "description": "The app installs on old Android releases that lack modern platform security fixes and protections (e.g. TLS 1.2 defaults, network security config, runtime permissions).",
+      "evidence": "android:minSdkVersion=15",
+      "location": "AndroidManifest.xml <uses-sdk>",
+      "recommendation": "Raise minSdkVersion to at least 24.",
+      "masvs": [
+        "MASVS-CODE-1"
+      ]
+    },
+    {
+      "rule_id": "MANIFEST-006",
+      "title": "Exported activity without permission: PaymentActivity",
+      "severity": "medium",
+      "confidence": "high",
+      "analyzer": "manifest",
+      "description": "This activity is reachable by any app on the device because android:exported is true, and no android:permission protects it. Untrusted callers can send it crafted intents.",
+      "evidence": "<activity android:name=\"com.example.vulnapp.PaymentActivity\"> exported, no permission",
+      "location": "AndroidManifest.xml <activity com.example.vulnapp.PaymentActivity>",
+      "recommendation": "Set android:exported=\"false\" unless external access is required; otherwise guard it with a signature-level android:permission and validate all incoming data.",
+      "masvs": [
+        "MASVS-PLATFORM-1"
+      ]
+    },
+    {
+      "rule_id": "MANIFEST-006",
+      "title": "Exported service without permission: SyncService",
+      "severity": "medium",
+      "confidence": "high",
+      "analyzer": "manifest",
+      "description": "This service is reachable by any app on the device because android:exported is true, and no android:permission protects it. Untrusted callers can send it crafted intents.",
+      "evidence": "<service android:name=\"com.example.vulnapp.SyncService\"> exported, no permission",
+      "location": "AndroidManifest.xml <service com.example.vulnapp.SyncService>",
+      "recommendation": "Set android:exported=\"false\" unless external access is required; otherwise guard it with a signature-level android:permission and validate all incoming data.",
+      "masvs": [
+        "MASVS-PLATFORM-1"
+      ]
+    },
+    {
+      "rule_id": "MANIFEST-007",
+      "title": "Sensitive permission requested: READ_SMS",
+      "severity": "medium",
+      "confidence": "high",
+      "analyzer": "manifest",
+      "description": "Can read or send SMS, a common vector for OTP theft and premium-rate fraud. Request only what the app needs and justify it in the privacy policy.",
+      "evidence": "<uses-permission android:name=\"android.permission.READ_SMS\">",
+      "location": "AndroidManifest.xml <uses-permission>",
+      "recommendation": "Remove the permission if unused; request dangerous permissions at runtime, in context.",
+      "masvs": [
+        "MASVS-PRIVACY-1"
+      ]
+    },
+    {
+      "rule_id": "NETWORK-004",
+      "title": "Cleartext traffic permitted for all domains",
+      "severity": "medium",
+      "confidence": "high",
+      "analyzer": "network",
+      "description": "<base-config cleartextTrafficPermitted=\"true\"> allows plain HTTP to every domain.",
+      "evidence": "<base-config cleartextTrafficPermitted=\"true\">",
+      "location": "res/xml/network_security_config.xml",
+      "recommendation": "Set cleartextTrafficPermitted to false and use HTTPS.",
+      "masvs": [
+        "MASVS-NETWORK-1"
+      ]
+    },
+    {
+      "rule_id": "SECRET-GOOGLE-API-KEY",
+      "title": "Hardcoded secret: Google API key",
+      "severity": "medium",
+      "confidence": "high",
+      "analyzer": "secrets",
+      "description": "A Google API key is embedded in the app. Such keys are often meant to be public (Maps, Firebase) but are abusable and billable if not restricted.",
+      "evidence": "AIza************34 (39 chars)",
+      "location": "resources.arsc string/google_api_key",
+      "recommendation": "In Google Cloud Console restrict the key to your app's package name and SHA-1 fingerprint and to only the APIs it needs.",
+      "masvs": [
+        "MASVS-STORAGE-2",
+        "MASVS-CRYPTO-2"
+      ]
+    },
+    {
+      "rule_id": "SECRET-JWT",
+      "title": "Hardcoded secret: JSON Web Token",
+      "severity": "medium",
+      "confidence": "medium",
+      "analyzer": "secrets",
+      "description": "A hardcoded JWT is present. If it is a real, unexpired token it lets anyone act as its subject; even expired tokens leak claims.",
+      "evidence": "eyJh************5c (127 chars)",
+      "location": "classes.dex string pool",
+      "recommendation": "Remove the token and issue tokens at login. Decode it to check for sensitive claims.",
+      "masvs": [
+        "MASVS-STORAGE-2",
+        "MASVS-AUTH-1"
+      ]
+    },
+    {
+      "rule_id": "MANIFEST-005",
+      "title": "Outdated targetSdkVersion (28)",
+      "severity": "low",
+      "confidence": "high",
+      "analyzer": "manifest",
+      "description": "Targeting an old API level opts the app out of newer platform hardening (scoped storage, implicit-export rules, background limits).",
+      "evidence": "android:targetSdkVersion=28",
+      "location": "AndroidManifest.xml <uses-sdk>",
+      "recommendation": "Target API 30 or newer.",
+      "masvs": [
+        "MASVS-CODE-1"
+      ]
+    },
+    {
+      "rule_id": "MANIFEST-007",
+      "title": "Sensitive permission requested: CAMERA",
+      "severity": "low",
+      "confidence": "high",
+      "analyzer": "manifest",
+      "description": "Captures camera or microphone input; verify it is needed and user-visible. Request only what the app needs and justify it in the privacy policy.",
+      "evidence": "<uses-permission android:name=\"android.permission.CAMERA\">",
+      "location": "AndroidManifest.xml <uses-permission>",
+      "recommendation": "Remove the permission if unused; request dangerous permissions at runtime, in context.",
+      "masvs": [
+        "MASVS-PRIVACY-1"
+      ]
+    },
+    {
+      "rule_id": "MANIFEST-007",
+      "title": "Sensitive permission requested: ACCESS_FINE_LOCATION",
+      "severity": "low",
+      "confidence": "high",
+      "analyzer": "manifest",
+      "description": "Collects the user's location. Request only what the app needs and justify it in the privacy policy.",
+      "evidence": "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\">",
+      "location": "AndroidManifest.xml <uses-permission>",
+      "recommendation": "Remove the permission if unused; request dangerous permissions at runtime, in context.",
+      "masvs": [
+        "MASVS-PRIVACY-1"
+      ]
+    },
+    {
+      "rule_id": "MANIFEST-007",
+      "title": "Sensitive permission requested: WRITE_EXTERNAL_STORAGE",
+      "severity": "low",
+      "confidence": "high",
+      "analyzer": "manifest",
+      "description": "Shared storage is readable by other apps; never put secrets there. Request only what the app needs and justify it in the privacy policy.",
+      "evidence": "<uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\">",
+      "location": "AndroidManifest.xml <uses-permission>",
+      "recommendation": "Remove the permission if unused; request dangerous permissions at runtime, in context.",
+      "masvs": [
+        "MASVS-STORAGE-2",
+        "MASVS-PRIVACY-1"
+      ]
+    },
+    {
+      "rule_id": "NETWORK-004",
+      "title": "Cleartext traffic permitted for legacy.example.com",
+      "severity": "low",
+      "confidence": "high",
+      "analyzer": "network",
+      "description": "A <domain-config> opts specific domains into plain HTTP.",
+      "evidence": "<domain-config cleartextTrafficPermitted=\"true\"> legacy.example.com",
+      "location": "res/xml/network_security_config.xml",
+      "recommendation": "Migrate these hosts to HTTPS and remove the exception.",
+      "masvs": [
+        "MASVS-NETWORK-1"
+      ]
+    },
+    {
+      "rule_id": "NETWORK-007",
+      "title": "No certificate pinning detected",
+      "severity": "info",
+      "confidence": "low",
+      "analyzer": "network",
+      "description": "Neither a <pin-set> in the network security config nor a known pinning library (OkHttp CertificatePinner, TrustKit) was found. Without pinning a rogue or compromised CA can intercept traffic to your backend.",
+      "evidence": "",
+      "location": "",
+      "recommendation": "For apps handling sensitive data, pin your backend's public key (<pin-set>) and include a backup pin.",
+      "masvs": [
+        "MASVS-NETWORK-2"
+      ]
+    }
+  ]
+}
